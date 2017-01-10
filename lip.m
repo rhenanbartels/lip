@@ -93,19 +93,28 @@ function lung = uncalibrateLung(lung, metadata)
 end
 
 
-function hasROIS = checkForCalibrationROI(handles)
+function [hasROIS, output] = checkForCalibrationROI(handles)
     children = get(handles.gui.mainAxes, 'Child');
     nCircles = 0;
     for i = 1:length(children)
         fields = get(children(i));
         if isfield(fields, 'Type') && strcmp(fields.Type, 'rectangle')  
-            nCircles = nCircles + 1;
+            nCircles = nCircles + 1;            
         end
     end
     hasROIS = nCircles == 2;
+    
+    if hasROIS
+        [avgAir, roiAir] = averageCircle(handles, 'air');
+        [avgTissue, roiTissue] = averageCircle(handles, 'tissue');
+        output.avg.air = avgAir;
+        output.avg.tissue = avgTissue;
+        output.struct.air = roiAir;
+        output.struct.tissue = roiTissue;
+    end
 end
 
-function [m, imgMask] = averageCircle(hObject, eventdata, roi_type)
+function [m, imgMask] = averageCircle(handles, roi_type)
 %meanDisk computes mean of values inside a circle
 %   M = meanDisk(IMG, XC, YC, R) returns the mean of IMG(Y,X) for all X and
 %   Y such that the Euclidean distance of (X,Y) from (XC,YC) is less than
@@ -132,10 +141,10 @@ xc = position(1) + r; %reposiciona o centro do circulo.
 yc = position(2) + r; %reposiciona o centro do circulo.
 %raio
 
-img = handles.dicom.rawLung;
+img = handles.data.lung;
 
-slice = str2double(get(handles.editSlice, 'string'));
-[sy sx] = size(handles.dicom.rawLung(:,:, slice));
+slice = str2double(get(handles.gui.currentSlicePosition, 'string'));
+[sy sx] = size(img(:,:, slice));
 xmin = max(1, floor(xc-r));
 xmax = min(sx, ceil(xc+r));
 ymin = max(1, floor(yc-r));
@@ -335,9 +344,15 @@ end
 function execute(hObject, eventdata)
     handles = guidata(hObject);
     
-    hasROIS = checkForCalibrationROI(handles);
+    [hasROIS, roiInfo] = checkForCalibrationROI(handles);
     
     if hasROIS
+        avgAir = roiInfo.avg.air;
+        avgTissue = roiInfo.avg.tissue;
+        
+        %Calibrate Lung
+        calibratedLung = lungCalibration(handles.data.lung, avgAir,...
+            avgTissue);
     end
     
 end
