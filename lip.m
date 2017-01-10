@@ -69,6 +69,15 @@ function showMask(lungDim, mask)
     set(h, 'AlphaData', mask);    
 end
 
+%%% Execute External Functions %%%
+function executeExternalFunctions(handles, functionsList)
+    functionsPath = 'extra_functions';
+    currentDir = pwd;
+    cd(functionsPath);
+    feval(functionsList{1}, 'oi')
+    cd(currentDir)
+end
+
 
 function currentSlicePosition = getCurrentSlicePosition(handles)
     currentSlicePosition = str2double(get(handles.gui.currentSlicePosition,...
@@ -86,6 +95,24 @@ function makeWidgetsVisible(handles)
     set(handles.gui.currentSlicePosition, 'Visible', 'On')
     set(handles.gui.patName, 'Visible', 'On')
     set(handles.gui.executeButton, 'Visible', 'On');
+    set(handles.gui.functionsList, 'Visible', 'On');
+    set(handles.gui.functionsListTitle, 'Visible', 'On');
+    set(handles.gui.refreshFunctionsList, 'Visible', 'On');
+    setFunctionsName(handles);
+    
+end
+
+function setFunctionsName(handles)    
+    dirInfo = dir(['extra_functions' filesep '*.m']);
+    nFiles = length(dirInfo);
+    
+    functionsNameList = cell(nFiles);
+    
+    for i = 1:nFiles
+        functionsNameList{i} = dirInfo(i).name;
+    end
+    set(handles.gui.functionsList, 'String', functionsNameList);
+        
 end
 
 function lung = uncalibrateLung(lung, metadata)
@@ -271,6 +298,11 @@ function openAirWay(hObject, eventdata)
    
 end
 
+function refreshFunctionsList(hObject, eventdata)
+    handles = guidata(hObject);
+    setFunctionsName(handles);
+end
+
 function roiAirCallback(hObject, eventdata)
     handles = guidata(hObject);
     [handles.roi_air_properties.handle, handles.roi_air_properties.position] =...
@@ -354,6 +386,8 @@ function execute(hObject, eventdata)
         %Calibrate Lung
         calibratedLung = lungCalibration(handles.data.lung, avgAir,...
             avgTissue);
+        executeExternalFunctions(handles,...
+            get(handles.gui.functionsList, 'String'))
     end
     
 end
@@ -454,7 +488,15 @@ function drawInterface()
         'String', 'Execute',...
         'Visible', 'Off',...
         'Tag', 'executeButton',...
-        'Callback', @execute)
+        'Callback', @execute)    
+    
+    uicontrol('Parent', mainFigure,...
+        'Units', 'Normalized',...
+        'Position',[0.75, 0.35, 0.05, 0.03],...
+        'String', 'Refresh',...
+        'Visible', 'Off',...
+        'Tag', 'refreshFunctionsList',...
+        'Callback', @refreshFunctionsList)
     
     
     %% Edit box %%
@@ -488,6 +530,23 @@ function drawInterface()
         'Tag', 'patName',...
         'Visible', 'Off')
     
+ uicontrol('Parent', mainFigure,...
+        'Units', 'Normalized',...
+        'Position', [0.75, 0.7, 0.4, 0.03],...
+        'Style', 'Text',...
+        'HorizontalAlignment', 'Left',...
+        'Backgroundcolor',bckColor,...
+        'String', 'Extra Functions:',...
+        'Tag', 'functionsListTitle',...
+        'Visible', 'Off')
+    
+    %% List box %%
+    uicontrol('Parent', mainFigure,...
+        'Units', 'Normalized',...
+        'Position', [0.75, 0.4, 0.2, 0.3],...
+        'Style', 'List',...
+        'Visible', 'Off',...
+        'Tag', 'functionsList');
     
     handles.gui = guihandles(mainFigure);
     guidata(mainFigure, handles)
