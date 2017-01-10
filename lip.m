@@ -122,7 +122,7 @@ function [m, imgMask] = averageCircle(handles, roi_type)
 %   lie within the circle.
 % This section is for efficiency only - avoids wasting computation time on
 % pixels outside the bounding square
-handles = guidata(hObject);
+
 switch roi_type
     case 'air'
         circle_object = findobj(gca, 'Type', 'rectangle','-and',...
@@ -168,7 +168,8 @@ py = y;
 dragging = [];
 orPos = [];
 
-set(gcf,'WindowButtonUpFcn',@dropObject,'units','normalized','WindowButtonMotionFcn',@moveObject);
+set(gcf,'WindowButtonUpFcn',@dropObject,'units','normalized',...
+    'WindowButtonMotionFcn',@moveObject);
 
 a = rectangle('Position',[px py d d],'Curvature',[1,1],...
     'ButtonDownFcn',@dragObject,'EdgeColor', color, 'LineWidth', 2);
