@@ -28,6 +28,327 @@ function [metadata, dicomImages] = getDicomData(dirName)
     close(h)
 end
 
+%%% CALCULATIONS %%%
+function percent_mass(lung, lungMask, metadata)
+   %Discover where the mask
+    maskPosition = find(sum(sum(lungMask)) >= 1);
+    maskTotal = lungMask(:, :, maskPosition);
+    lung = lung(:, :, maskPosition);
+    
+    %Whole lung
+    resultsClassical = classicalAnalysis(lung, maskTotal, metadata);
+    resultsPercentile = lungAnalysis(lung, maskTotal, metadata);
+end
+
+function results  = lungAnalysis(lung, mask, metadata)
+
+    voxelVolume = calculateVoxelVolume(metadata(1), metadata(2));
+
+    roiAir = -1000;
+    roiTissue = 50;
+    
+    lung(mask == 0) = 10000;
+    
+    lung = int32(lung);
+
+    lung(lung < -1000 | lung > 100) = [];
+
+
+
+    huValues = double(unique(lung));
+    nLung = size(lung, 3);
+
+    massPerDensity = zeros(1, length(huValues));
+    volumePerDensity = zeros(1, length(huValues));
+    voxelPerDensity = zeros(1, length(huValues));
+    counter = 1;    
+
+    h = waitbar(0, 'Calculating Mass Percentile...');
+
+    for hu = huValues    
+        nVoxels = length(lung(lung == hu));
+        massPerDensity(counter) = ((hu - roiAir)/(roiTissue - roiAir))...
+            * voxelVolume * 1.04 * nVoxels;
+        volumePerDensity(counter) = nVoxels * voxelVolume / 1000;
+        voxelPerDensity(counter) = nVoxels;
+        lung(lung == hu) = [];
+        counter = counter + 1;
+        waitbar(counter / length(huValues))
+    end
+    close(h)
+    sumMass = cumsum(massPerDensity);
+
+    sumVolume = cumsum(volumePerDensity);
+    cumulativeVolume = sumVolume / sumVolume(end) * 100;
+    %cumulativeVoxel = cumsum(voxelPerDensity);
+
+    [~, pos3] = min(abs(cumulativeVolume - 3));
+    [~, pos15] = min(abs(cumulativeVolume - 15));    
+    [~, pos85] = min(abs(cumulativeVolume - 85));
+    [~, pos97] = min(abs(cumulativeVolume - 97));
+
+    results.p3Mass = sumMass(pos3);
+    results.p15Mass = sumMass(pos15);    
+    results.p85Mass = sumMass(end) - sumMass(pos85);
+    results.p97Mass = sumMass(end) - sumMass(pos97);
+    
+    results.p3Volume = sumVolume(pos3);
+    results.p15Volume = sumVolume(pos15);
+    results.p85Volume = sumVolume(end) - sumVolume(pos85);
+    results.p97Volume = sumVolume(end) - sumVolume(pos97);
+    
+    results.p3Density = results.p3Mass / results.p3Volume;
+    results.p15Density = results.p15Mass / results.p15Volume;
+    results.p85Density = results.p85Mass / results.p85Volume;
+    results.p97Density = results.p97Mass /results. p97Volume;
+
+    results.totalVolume = sumVolume(end);
+    results.totalMass = sumMass(end);
+    
+    results.massPerDensity = massPerDensity;
+    results.volumePerDensity = volumePerDensity;
+    results.huValues = huValues;
+    results.voxelPerDensity = voxelPerDensity;
+end
+
+function results = classicalAnalysis(lung, mask, metadata)
+    voxelVolume = calculateVoxelVolume(metadata(1), metadata(2)); 
+    
+    
+    roiAir = -1000;
+    roiTissue = 50;
+    
+    lung(mask == 0) = 10000;
+    
+    nSlices = size(lung, 3);
+   
+    
+    hyper = [-1000, -901];
+    poor = [-900, -501];
+    normally = [-500, -101];
+    non = [-100, 100];
+    
+    %Mass
+    hyperMassPerSlice = zeros(1, nSlices);
+    poorMassPerSlice = zeros(1, nSlices);
+    normallyMassPerSlice = zeros(1, nSlices);
+    nonMassPerSlice = zeros(1, nSlices);
+    totalMassPerSlice = zeros(1, nSlices);
+    
+    hyperMassPercentualPerSlice = zeros(1, nSlices);
+    poorMassPercentualPerSlice = zeros(1, nSlices);
+    normallyMassPercentualPerSlice = zeros(1, nSlices);
+    nonMassPercentualPerSlice = zeros(1, nSlices);
+    
+    %Volume
+    hyperVolumePerSlice = zeros(1, nSlices);
+    poorVolumePerSlice = zeros(1, nSlices);
+    normallyVolumePerSlice = zeros(1, nSlices);
+    nonVolumePerSlice = zeros(1, nSlices);
+    totalVolumePerSlice = zeros(1, nSlices);
+    
+    hyperVolumePercentualPerSlice = zeros(1, nSlices);
+    poorVolumePercentualPerSlice = zeros(1, nSlices);
+    normallyVolumePercentualPerSlice = zeros(1, nSlices);
+    nonVolumePercentualPerSlice = zeros(1, nSlices);
+    
+    %Density
+    hyperDensityPerSlice = zeros(1, nSlices);
+    poorDensityPerSlice = zeros(1, nSlices);
+    normallyDensityPerSlice = zeros(1, nSlices);
+    nonDensityPerSlice = zeros(1, nSlices);
+    totalDensityPerSlice = zeros(1, nSlices);    
+    
+    h = waitbar(0, 'Calculating Classical Indexes...');
+    
+    for idx = 1:nSlices
+        currentSlice = lung(:, :, idx);
+        currentMask = mask(:, :, idx) >= 1;
+        voxels = single(int32(currentSlice(currentMask)));
+        
+        
+        % Group the voxels according to their HU value.
+        voxels_non  = voxels(voxels >= non(1) & voxels <=...
+            non(2));
+        voxels_poor  = voxels(voxels >= poor(1) & voxels <=...
+            poor(2));
+        voxels_norm  = voxels(voxels >= normally(1) & voxels <=...
+            normally(2));
+        voxels_hyp  = voxels(voxels >= hyper(1) & voxels <=...
+            hyper(2));
+        voxels_total = voxels(voxels >= hyper(1) & voxels <=...
+            non(2));
+        
+        %Mass
+        hyperMassPerSlice(idx) = sum(((voxels_hyp  - roiAir)/(roiTissue -...
+            roiAir)) * voxelVolume * 1.04);
+        
+        poorMassPerSlice(idx) = sum(((voxels_poor  - roiAir)/(roiTissue -...
+            roiAir)) * voxelVolume * 1.04);
+        
+        normallyMassPerSlice(idx) = sum(((voxels_norm  - roiAir)/(roiTissue -...
+            roiAir)) * voxelVolume * 1.04);
+        
+        nonMassPerSlice(idx) = sum(((voxels_non  - roiAir)/(roiTissue -...
+            roiAir)) * voxelVolume * 1.04);
+        
+        totalMassPerSlice(idx) = sum(((voxels_total  - roiAir)/(roiTissue -...
+            roiAir)) * voxelVolume * 1.04);
+        
+        %Mass Percentuais
+        hyperMassPercentualPerSlice(idx) = hyperMassPerSlice(idx) /...
+            totalMassPerSlice(idx) * 100;
+        
+        poorMassPercentualPerSlice(idx) = poorMassPerSlice(idx) / ...
+            totalMassPerSlice(idx) * 100;
+        
+        normallyMassPercentualPerSlice(idx) = normallyMassPerSlice(idx) / ...
+            totalMassPerSlice(idx) * 100;
+        
+        nonMassPercentualPerSlice(idx) = nonMassPerSlice(idx) / ...
+            totalMassPerSlice(idx) * 100;
+        
+        
+         
+        %Volume
+        hyperVolumePerSlice(idx) = length(voxels_hyp) * voxelVolume;
+        
+        poorVolumePerSlice(idx) = length(voxels_poor) * voxelVolume;
+        
+        normallyVolumePerSlice(idx) = length(voxels_norm) * voxelVolume;
+        
+        nonVolumePerSlice(idx) = length(voxels_non) * voxelVolume;
+        
+        totalVolumePerSlice(idx) = length(voxels_total) * voxelVolume;
+        
+        %Volume Percentuais
+        hyperVolumePercentualPerSlice(idx) = hyperVolumePerSlice(idx) /...
+            totalVolumePerSlice(idx) * 100;
+        
+        poorVolumePercentualPerSlice(idx) = poorVolumePerSlice(idx) / ...
+            totalVolumePerSlice(idx) * 100;
+        
+        normallyVolumePercentualPerSlice(idx) = normallyVolumePerSlice(idx) / ...
+            totalVolumePerSlice(idx) * 100;
+        
+        nonVolumePercentualPerSlice(idx) = nonVolumePerSlice(idx) / ...
+            totalVolumePerSlice(idx) * 100;
+        
+        
+        %Density
+        hyperDensityPerSlice(idx) = hyperMassPerSlice(idx) /...
+            hyperVolumePerSlice(idx);
+        
+        poorDensityPerSlice(idx) = poorMassPerSlice(idx) /...
+            poorVolumePerSlice(idx);
+        
+        normallyDensityPerSlice(idx) = normallyMassPerSlice(idx) /...
+            normallyVolumePerSlice(idx);
+        
+        nonDensityPerSlice(idx) = nonMassPerSlice(idx) /...
+            nonVolumePerSlice(idx);
+        
+        totalDensityPerSlice(idx) = totalMassPerSlice(idx) /...
+            totalVolumePerSlice(idx);
+        
+        waitbar(idx / nSlices)
+    end    
+    close(h)
+    
+    %Whole Lung
+    %Mass
+    results.hyperMass = sum(hyperMassPerSlice);
+    results.poorMass = sum(poorMassPerSlice);
+    results.nonMass = sum(nonMassPerSlice);
+    results.normallyMass = sum(normallyMassPerSlice);
+    results.totalMass = sum(totalMassPerSlice);
+    
+    %Volume
+    results.hyperVolume = sum(hyperVolumePerSlice);
+    results.poorVolume = sum(poorVolumePerSlice);
+    results.nonVolume = sum(nonVolumePerSlice);
+    results.normallyVolume = sum(normallyVolumePerSlice);
+    results.totalVolume = sum(totalVolumePerSlice);
+    
+    %Density
+    results.hyperDensity = results.hyperMass / results.hyperVolume;
+    results.poorDensity = results.poorMass / results.poorVolume;
+    results.nonDensity = results.nonMass / results.nonVolume;
+    results.normallyDensity = results.normallyMass / results.normallyVolume;
+    results.totalDensity = results.totalMass / results.totalVolume;
+    
+    
+    %Assign results
+    %Mass
+    results.hyperMassPerSlice = hyperMassPerSlice;
+    results.poorMassPerSlice = poorMassPerSlice;
+    results.normallyMassPerSlice = normallyMassPerSlice;
+    results.nonMassPerSlice = nonMassPerSlice;
+    results.totalMassPerSlice = totalMassPerSlice;
+    
+    results.hyperMassPercentualPerSlice = hyperMassPercentualPerSlice;
+    results.poorMassPercentualPerSlice = poorMassPercentualPerSlice;
+    results.normallyMassPercentualPerSlice = normallyMassPercentualPerSlice;
+    results.nonMassPercentualPerSlice = nonMassPercentualPerSlice;
+    
+    %Volume
+    results.hyperVolumePerSlice = hyperVolumePerSlice;
+    results.poorVolumePerSlice = poorVolumePerSlice;
+    results.normallyVolumePerSlice = normallyVolumePerSlice;
+    results.nonVolumePerSlice = nonVolumePerSlice;
+    results.totalVolumePerSlice = totalVolumePerSlice;
+    
+    results.hyperVolumePercentualPerSlice = hyperVolumePercentualPerSlice;
+    results.poorVolumePercentualPerSlice = poorVolumePercentualPerSlice;
+    results.normallyVolumePercentualPerSlice = normallyVolumePercentualPerSlice;
+    results.nonVolumePercentualPerSlice = nonVolumePercentualPerSlice;
+    
+    %Density
+    results.hyperDensityPerSlice = hyperDensityPerSlice;
+    results.poorDensityPerSlice = poorDensityPerSlice;
+    results.normallyDensityPerSlice = normallyDensityPerSlice;
+    results.nonDensityPerSlice = nonDensityPerSlice;
+    results.totalDensityPerSlice = totalDensityPerSlice;
+    
+end
+
+%%% Voxel Volume %%%
+function voxelVolume = calculateVoxelVolume(metadata, metadata2)
+if isfield(metadata,'SpacingBetweenSlices');
+    if isfield(metadata,'SliceThickness')
+        if abs(metadata.SpacingBetweenSlices) < metadata.SliceThickness
+            voxelVolume =(metadata.PixelSpacing(1) ^ 2 *...
+                metadata.SliceThickness * 0.001) *...
+                (abs(metadata.SpacingBetweenSlices) / metadata.SliceThickness);
+        else
+            voxelVolume = (metadata.PixelSpacing(1) ^ 2 *...
+                metadata.SliceThickness * 0.001);
+        end
+    else
+        voxelVolume = (metadata.PixelSpacing(1) ^ 2 *...
+            metadata.SliceThickness * 0.001);
+    end
+else
+    
+    if isfield(metadata,'SliceThickness')==1;
+        thick=abs(metadata.SliceThickness);
+    elseif isfield(metadata,'SpacingBetweenSlices');
+        thick=abs(metadata.SpacingBetweenSlices);
+    else
+        thick=abs(metadata.PixelDimensions(3));
+    end
+    
+    if isfield(metadata, 'SliceLocation')
+        SpacingBetweenSlices = abs(metadata2.SliceLocation -...
+            metadata.SliceLocation);
+    end
+
+    SliceThickness = metadata.SliceThickness;
+    voxelVolume = (metadata.PixelSpacing(1) ^ 2 * thick * 0.001) *...
+        (SpacingBetweenSlices / SliceThickness);
+end
+end
+
 %%%% LUNG CALIBRATION %%%%
 function calibratedLung = lungCalibration(rawLung, mAir, mTissue)
     coef = polyfit([mAir, mTissue], [-1000 50], 1);
@@ -69,16 +390,6 @@ function showMask(lungDim, mask)
     set(h, 'AlphaData', mask);    
 end
 
-%%% Execute External Functions %%%
-function executeExternalFunctions(handles, functionsList)
-    functionsPath = 'extra_functions';
-    currentDir = pwd;
-    cd(functionsPath);
-    feval(functionsList{1}, 'oi')
-    cd(currentDir)
-end
-
-
 function currentSlicePosition = getCurrentSlicePosition(handles)
     currentSlicePosition = str2double(get(handles.gui.currentSlicePosition,...
         'String'));
@@ -94,33 +405,17 @@ function makeWidgetsVisible(handles)
     set(handles.gui.buttonPrevious, 'Visible', 'On')
     set(handles.gui.currentSlicePosition, 'Visible', 'On')
     set(handles.gui.patName, 'Visible', 'On')
-    set(handles.gui.executeButton, 'Visible', 'On');
-    set(handles.gui.functionsList, 'Visible', 'On');
-    set(handles.gui.functionsListTitle, 'Visible', 'On');
-    set(handles.gui.refreshFunctionsList, 'Visible', 'On');
-    setFunctionsName(handles);
-    
-end
-
-function setFunctionsName(handles)    
-    dirInfo = dir(['extra_functions' filesep '*.m']);
-    nFiles = length(dirInfo);
-    
-    functionsNameList = cell(nFiles);
-    
-    for i = 1:nFiles
-        functionsNameList{i} = dirInfo(i).name;
-    end
-    set(handles.gui.functionsList, 'String', functionsNameList);
-        
+    set(handles.gui.executeButton, 'Visible', 'On');    
 end
 
 function lung = uncalibrateLung(lung, metadata)
-    lung = (lung - metadata.RescaleIntercept) / metadata.RescaleSlope;
+    lung = (single(lung) - metadata.RescaleIntercept) / metadata.RescaleSlope;
 end
 
 
-function [hasROIS, output] = checkForCalibrationROI(handles)
+function [hasROIS, avgAir, avgTissue, roiAir, roiTissue] =...
+    checkForCalibrationROI(handles)   
+    
     children = get(handles.gui.mainAxes, 'Child');
     nCircles = 0;
     for i = 1:length(children)
@@ -134,10 +429,6 @@ function [hasROIS, output] = checkForCalibrationROI(handles)
     if hasROIS
         [avgAir, roiAir] = averageCircle(handles, 'air');
         [avgTissue, roiTissue] = averageCircle(handles, 'tissue');
-        output.avg.air = avgAir;
-        output.avg.tissue = avgTissue;
-        output.struct.air = roiAir;
-        output.struct.tissue = roiTissue;
     end
 end
 
@@ -377,17 +668,17 @@ end
 function execute(hObject, eventdata)
     handles = guidata(hObject);
     
-    [hasROIS, roiInfo] = checkForCalibrationROI(handles);
+    [hasROIS, avgAir, avgTissue, roiAir, roiTissue] =...
+        checkForCalibrationROI(handles);
     
     if hasROIS
-        avgAir = roiInfo.avg.air;
-        avgTissue = roiInfo.avg.tissue;
+        handles.data.avgAir = avgAir;
+        handles.data.avgTissue = avgTissue;
         
         %Calibrate Lung
-        calibratedLung = lungCalibration(handles.data.lung, avgAir,...
-            avgTissue);
-        executeExternalFunctions(handles,...
-            get(handles.gui.functionsList, 'String'))
+        lung = lungCalibration(handles.data.lung,...
+            handles.data.avgAir, handles.data.avgTissue);
+        percent_mass(lung, handles.data.lungMask, handles.data.metadata);
     end
     
 end
@@ -490,15 +781,7 @@ function drawInterface()
         'Tag', 'executeButton',...
         'Callback', @execute)    
     
-    uicontrol('Parent', mainFigure,...
-        'Units', 'Normalized',...
-        'Position',[0.75, 0.35, 0.05, 0.03],...
-        'String', 'Refresh',...
-        'Visible', 'Off',...
-        'Tag', 'refreshFunctionsList',...
-        'Callback', @refreshFunctionsList)
-    
-    
+   
     %% Edit box %%
     uicontrol('Parent', mainFigure,...
         'Units', 'Normalized',...
@@ -528,26 +811,8 @@ function drawInterface()
         'Backgroundcolor', bckColor,...
         'String', 'Patient Name:',...
         'Tag', 'patName',...
-        'Visible', 'Off')
-    
- uicontrol('Parent', mainFigure,...
-        'Units', 'Normalized',...
-        'Position', [0.75, 0.7, 0.4, 0.03],...
-        'Style', 'Text',...
-        'HorizontalAlignment', 'Left',...
-        'Backgroundcolor',bckColor,...
-        'String', 'Extra Functions:',...
-        'Tag', 'functionsListTitle',...
-        'Visible', 'Off')
-    
-    %% List box %%
-    uicontrol('Parent', mainFigure,...
-        'Units', 'Normalized',...
-        'Position', [0.75, 0.4, 0.2, 0.3],...
-        'Style', 'List',...
-        'Visible', 'Off',...
-        'Tag', 'functionsList');
-    
+        'Visible', 'Off')    
+        
     handles.gui = guihandles(mainFigure);
     guidata(mainFigure, handles)
 
