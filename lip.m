@@ -404,8 +404,8 @@ function makeWidgetsVisible(handles)
     set(handles.gui.buttonNext, 'Visible', 'On')
     set(handles.gui.buttonPrevious, 'Visible', 'On')
     set(handles.gui.currentSlicePosition, 'Visible', 'On')
-    set(handles.gui.patName, 'Visible', 'On')
-    set(handles.gui.executeButton, 'Visible', 'On');    
+    set(handles.gui.patName, 'Visible', 'On') 
+    set(handles.gui.maskMenu, 'Enable', 'On')
 end
 
 function lung = uncalibrateLung(lung, metadata)
@@ -622,7 +622,13 @@ function openHDR(hObject, eventdata)
         masks = getHDRMask([pathName name]);
         handles.data.lungMask = masks;
         guidata(hObject, handles)
+        
+        %Enable widget On
         set(handles.gui.showMask, 'Visible', 'On')
+        set(handles.gui.executeButton, 'Visible', 'On'); 
+        %menu
+        set(handles.gui.calibrationMenu, 'Enable', 'On')
+        set(handles.gui.imageMenu, 'Enable', 'On')        
     end
 end
 
@@ -709,7 +715,9 @@ function drawInterface()
         'Callback', @openDicom);
     
     masksMenu = uimenu('Parent', fileMenu,...
-        'Label', 'Open Masks');
+        'Label', 'Open Masks',...
+        'Tag', 'maskMenu',...
+        'Enable', 'Off');
     
     uimenu('Parent', masksMenu,...
         'Label', '.hdr',...
@@ -730,7 +738,9 @@ function drawInterface()
         'Callback', @openAirWay);
     
     calibrationMenu = uimenu('Parent',mainFigure,...
-        'Label', 'Calibration');
+        'Label', 'Calibration',...
+        'Tag', 'calibrationMenu',...
+        'Enable', 'Off');
     
     calibROIMenu = uimenu('Parent', calibrationMenu,...
         'Label', 'Set Calibration ROIs');
@@ -744,7 +754,9 @@ function drawInterface()
         'Callback', @roiTissueCallback);
     
     imageMenu = uimenu('Parent', mainFigure,...
-        'Label', 'Image');
+        'Label', 'Image',...
+        'Tag', 'imageMenu',...
+        'Enable', 'Off');
     
     uimenu('Parent', imageMenu,...
         'Label', 'Flip Image',...
