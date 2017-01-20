@@ -28,17 +28,82 @@ function [metadata, dicomImages] = getDicomData(dirName)
     %close(h)
 end
 
+%%% DIVIDE LUNG %%%
+function [firstLevel, secondLevel, thirdLevel] = divideLungIndexes(mask)
+    %numberOfMasks = unique(mask);    
+    
+    %if length(numberOfMasks) == 2
+        nSlices = size(mask, 3);
+        [firstLevel, secondLevel, thirdLevel] = lungThresholds(nSlices);
+    %end
+end
+
+function [firstLevel, secondLevel, thirdLevel] = lungThresholds(nSlices)
+    %Centimeters lung size;
+    oneThird = nSlices / 3;
+    floorOneThird = floor(oneThird);
+
+    diffOneThird = abs(floorOneThird - oneThird);
+
+    if (diffOneThird)
+        firstLevel = [1, floorOneThird + 1];
+        if diffOneThird > 0 && diffOneThird < 0.5
+            secondLevel = [firstLevel(2) + 1, firstLevel(2) + floorOneThird];
+        else
+            secondLevel = [firstLevel(2) + 1, firstLevel(2) + floorOneThird + 1];
+        end
+
+    else
+        firstLevel = [1 floorOneThird];
+        secondLevel = [floorOneThird + 1, firstLevel(2) + floorOneThird];
+    end
+
+    thirdLevel = [secondLevel(2) + 1, secondLevel(2) + floorOneThird];
+    assert(thirdLevel(2) == nSlices, 'Foi diferente')
+end
+
 %%% CALCULATIONS %%%
-function [resultsClassical, resultsPercentile] = allAnalysis(lung,...
-    lungMask, metadata)
+function [resultsClassicalWholeLung, resultsPercentileWholeLung,...
+    resultsClassicalBaseLung, resultsPercentileBaseLung,...
+    resultsClassicalMiddleLung, resultsPercentileMiddleLung,...
+    resultsClassicalTopLung, resultsPercentileTopLung] =...
+    allAnalysis(lung, lungMask, metadata)
+
    %Discover where the mask
     maskPosition = find(sum(sum(lungMask)) >= 1);
-    maskTotal = lungMask(:, :, maskPosition);
+    mask = lungMask(:, :, maskPosition);
     lung = lung(:, :, maskPosition);
     
+    %Divide Lung indexes
+    [firstLevel, secondLevel, thirdLevel] = divideLungIndexes(mask);
+    
     %Whole lung
-    resultsClassical = classicalAnalysis(lung, maskTotal, metadata);
-    resultsPercentile = lungAnalysis(lung, maskTotal, metadata);
+    resultsClassicalWholeLung = classicalAnalysis(lung, mask, metadata);
+    resultsPercentileWholeLung = lungAnalysis(lung, mask, metadata);
+    
+    %Base Lung
+    resultsClassicalBaseLung = classicalAnalysis(lung(:, :,...
+        firstLevel(1):firstLevel(2)), mask(:, :,...
+        firstLevel(1):firstLevel(2)), metadata);
+    resultsPercentileBaseLung = lungAnalysis(lung(:, :,...
+        firstLevel(1):firstLevel(2)), mask(:, :,...
+        firstLevel(1):firstLevel(2)), metadata);    
+    
+    %Middle Lung
+    resultsClassicalMiddleLung = classicalAnalysis(lung(:, :,...
+        secondLevel(1):secondLevel(2)), mask(:, :,...
+        secondLevel(1):secondLevel(2)), metadata);
+    resultsPercentileMiddleLung = lungAnalysis(lung(:, :,...
+        secondLevel(1):secondLevel(2)), mask(:, :,...
+        secondLevel(1):secondLevel(2)), metadata);
+    
+    %Top Lung
+    resultsClassicalTopLung = classicalAnalysis(lung(:, :,...
+        thirdLevel(1):thirdLevel(2)), mask(:, :,...
+        thirdLevel(1):thirdLevel(2)), metadata);
+    resultsPercentileTopLung = lungAnalysis(lung(:, :,...
+        thirdLevel(1):thirdLevel(2)), mask(:, :,...
+        thirdLevel(1):thirdLevel(2)), metadata);
 end
 
 function results  = lungAnalysis(lung, mask, metadata)
@@ -426,6 +491,8 @@ end
 function [hasROIS, avgAir, avgTissue, roiAir, roiTissue] =...
     checkForCalibrationROI(handles)   
     
+    avgAir = NaN; avgTissue = NaN; roiAir = NaN; roiTissue = NaN;
+
     children = get(handles.gui.mainAxes, 'Child');
     nCircles = 0;
     for i = 1:length(children)
@@ -594,8 +661,24 @@ function saveResults(hObject, eventdata)
         'Save Results');
     
     if name
-        allResults.wholeLung.classical = handles.data.resultsClassical;
-        allResults.wholeLung.percentual = handles.data.resultsPercentile;
+        %Whole Lung
+        allResults.wholeLung.classical = handles.data.resultsClassicalWholeLung;
+        allResults.wholeLung.percentual = handles.data.resultsPercentileWholeLung;
+        %Base Lung
+        allResults.baseLung.classical = handles.data.resultsClassicalBaseLung;      
+        allResults.baseLung.percentual = handles.data.resultsPercentileBaseLung;
+        %Middle Lung
+        allResults.middleLung.classical = handles.data.resultsClassicalMiddleLung;      
+        allResults.middleLung.percentual = handles.data.resultsPercentileMiddleLung;
+        %Top Lung
+        allResults.topLung.classical = handles.data.resultsClassicalTopLung;      
+        allResults.topLung.percentual = handles.data.resultsPercentileTopLung;
+        
+        %Structure
+        allResults.structure.mask = handles.data.lungMask;
+        allResults.structure.lung = handles.data.lung;
+        allResults.structure.roiAir = handles.data.roiAir;
+        allResults.structure.roiTissue = handles.data.roiTissue;
         save([pathName name], 'allResults')
     end
 end
@@ -710,8 +793,18 @@ function execute(hObject, eventdata)
         %Calibrate Lung
         lung = lungCalibration(handles.data.lung,...
             handles.data.avgAir, handles.data.avgTissue);
-        [handles.data.resultsClassical, handles.data.resultsPercentile] =...
+        [handles.data.resultsClassicalWholeLung,...
+            handles.data.resultsPercentileWholeLung,...
+            handles.data.resultsClassicalBaseLung,...
+            handles.data.resultsPercentileBaseLung,...
+            handles.data.resultsClassicalMiddleLung,...
+            handles.data.resultsPercentileMiddleLung,...
+            handles.data.resultsClassicalTopLung,...
+            handles.data.resultsPercentileTopLung]  =...
             allAnalysis(lung, handles.data.lungMask, handles.data.metadata);
+        
+        handles.data.roiAir = roiAir;
+        handles.data.roiTissue = roiTissue;
         
         %Enable save results menu
         set(handles.gui.saveResults, 'Enable', 'On');
