@@ -7,7 +7,7 @@ function [metadata, dicomImages] = getDicomData(dirName)
     nItems = length(filesAndFolders);
     
     
-    h = waitbar(0,'Loading Metadata and DICOMS...');
+   % h = waitbar(1,'Loading Metadata and DICOMS...');
     
     counter = 1;
     for idx = 1:nItems
@@ -19,17 +19,18 @@ function [metadata, dicomImages] = getDicomData(dirName)
                 metadata(counter) = dicominfo(fullPath);
                 dicomImages(:, :, counter) = dicomread(fullPath);
                 counter = counter + 1;
-                waitbar(counter / nItems);
+                %waitbar(counter / nItems);
             catch
                 continue
             end
         end
     end
-    close(h)
+    %close(h)
 end
 
 %%% CALCULATIONS %%%
-function percent_mass(lung, lungMask, metadata)
+function [resultsClassical, resultsPercentile] = allAnalysis(lung,...
+    lungMask, metadata)
    %Discover where the mask
     maskPosition = find(sum(sum(lungMask)) >= 1);
     maskTotal = lungMask(:, :, maskPosition);
@@ -63,7 +64,7 @@ function results  = lungAnalysis(lung, mask, metadata)
     voxelPerDensity = zeros(1, length(huValues));
     counter = 1;    
 
-    h = waitbar(0, 'Calculating Mass Percentile...');
+    %h = waitbar(0, 'Calculating Mass Percentile...');
 
     for hu = huValues    
         nVoxels = length(lung(lung == hu));
@@ -73,9 +74,9 @@ function results  = lungAnalysis(lung, mask, metadata)
         voxelPerDensity(counter) = nVoxels;
         lung(lung == hu) = [];
         counter = counter + 1;
-        waitbar(counter / length(huValues))
+        %waitbar(counter / length(huValues))
     end
-    close(h)
+   % close(h)
     sumMass = cumsum(massPerDensity);
 
     sumVolume = cumsum(volumePerDensity);
@@ -159,7 +160,7 @@ function results = classicalAnalysis(lung, mask, metadata)
     nonDensityPerSlice = zeros(1, nSlices);
     totalDensityPerSlice = zeros(1, nSlices);    
     
-    h = waitbar(0, 'Calculating Classical Indexes...');
+    %h = waitbar(0, 'Calculating Classical Indexes...');
     
     for idx = 1:nSlices
         currentSlice = lung(:, :, idx);
@@ -251,9 +252,9 @@ function results = classicalAnalysis(lung, mask, metadata)
         totalDensityPerSlice(idx) = totalMassPerSlice(idx) /...
             totalVolumePerSlice(idx);
         
-        waitbar(idx / nSlices)
+        %waitbar(idx / nSlices)
     end    
-    close(h)
+    %close(h)
     
     %Whole Lung
     %Mass
@@ -310,6 +311,15 @@ function results = classicalAnalysis(lung, mask, metadata)
     results.nonDensityPerSlice = nonDensityPerSlice;
     results.totalDensityPerSlice = totalDensityPerSlice;
     
+end
+
+function patientName = getPatientName(metadata)
+    patientName = 'patient_name';
+    if isfield(metadata, 'PatientName')
+        if isfield(metadata.PatientName,'FamilyName')
+            patientName = metadata.PatientName.FamilyName;
+        end
+    end
 end
 
 %%% Voxel Volume %%%
@@ -405,7 +415,7 @@ function makeWidgetsVisible(handles)
     set(handles.gui.buttonPrevious, 'Visible', 'On')
     set(handles.gui.currentSlicePosition, 'Visible', 'On')
     set(handles.gui.patName, 'Visible', 'On') 
-    set(handles.gui.maskMenu, 'Enable', 'On')
+    set(handles.gui.maskMenu, 'Enable', 'On')    
 end
 
 function lung = uncalibrateLung(lung, metadata)
@@ -574,6 +584,22 @@ function openDicom(hObject, eventdata)
     end
 end
 
+%Save Results
+function saveResults(hObject, eventdata)
+    handles = guidata(hObject);
+    
+    patientName = getPatientName(handles.data.metadata(1));
+    
+    [name, pathName] = uiputfile([patientName '.mat'],...
+        'Save Results');
+    
+    if name
+        allResults.wholeLung.classical = handles.data.resultsClassical;
+        allResults.wholeLung.percentual = handles.data.resultsPercentile;
+        save([pathName name], 'allResults')
+    end
+end
+
 function openAirWay(hObject, eventdata)
     handles = guidata(hObject);
     
@@ -684,7 +710,13 @@ function execute(hObject, eventdata)
         %Calibrate Lung
         lung = lungCalibration(handles.data.lung,...
             handles.data.avgAir, handles.data.avgTissue);
-        percent_mass(lung, handles.data.lungMask, handles.data.metadata);
+        [handles.data.resultsClassical, handles.data.resultsPercentile] =...
+            allAnalysis(lung, handles.data.lungMask, handles.data.metadata);
+        
+        %Enable save results menu
+        set(handles.gui.saveResults, 'Enable', 'On');
+        
+        guidata(hObject, handles)
     end
     
 end
@@ -718,6 +750,12 @@ function drawInterface()
         'Label', 'Open Masks',...
         'Tag', 'maskMenu',...
         'Enable', 'Off');
+    
+    uimenu('Parent', fileMenu,...
+        'Label', 'Save Results',...
+        'Tag', 'saveResults',...
+        'Enable', 'Off',...
+        'Callback', @saveResults);
     
     uimenu('Parent', masksMenu,...
         'Label', '.hdr',...
