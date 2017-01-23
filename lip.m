@@ -106,6 +106,22 @@ function [resultsClassicalWholeLung, resultsPercentileWholeLung,...
         thirdLevel(1):thirdLevel(2)), metadata);
 end
 
+function [lungOrMask, metadatas] = sortLungOrMask(lungOrMask, metadatas)
+    nSlices = length(metadatas);
+    sliceLocations = zeros(1, nSlices);
+    
+    for idx = 1:nSlices
+        sliceLocations(idx) = metadatas(idx).SliceLocation;
+    end
+    
+    [trash, sortedIndexes] = sort(sliceLocations);
+    
+    lungOrMask = lungOrMask(:, :, sortedIndexes);
+    if nargout == 2
+        metadatas = metadatas(sortedIndexes);
+    end
+end
+
 function results  = lungAnalysis(lung, mask, metadata)
 
     voxelVolume = calculateVoxelVolume(metadata(1), metadata(2));
@@ -637,14 +653,19 @@ function openDicom(hObject, eventdata)
         
         handles.lastPath = dirName;
         
-        [metadata, dicomImages] = getDicomData(dirName);
-        handles.data.metadata = metadata;
-        handles.data.lung = uncalibrateLung(dicomImages, metadata(1));
-        guidata(hObject, handles)
+        [metadata, dicomImages] = getDicomData(dirName);        
+        lung = uncalibrateLung(dicomImages, metadata(1));
+       
+        
+        %Sort lung
+        [handles.data.lung, handles.data.metadata] =...
+            sortLungOrMask(lung, metadata);
         
         %Post opening
         prepareAndShowLung(handles, 1)
         makeWidgetsVisible(handles)
+        
+        guidata(hObject, handles)
         
         %Set patient name
         set(handles.gui.patName, 'String', dirName);
@@ -729,7 +750,11 @@ function openHDR(hObject, eventdata)
     
     if name
         masks = getHDRMask([pathName name]);
-        handles.data.lungMask = masks;
+        
+                
+        %Sort masks
+        handles.data.lungMask = sortLungOrMask(masks, handles.data.metadata);      
+     
         guidata(hObject, handles)
         
         %Enable widget On
@@ -758,7 +783,10 @@ function openNrrdMask(hObject, eventdata)
         
         masks(masks >= 1) = 1;
         
-        handles.data.lungMask = masks;
+        %Sort masks
+        handles.data.lungMask = sortLungOrMask(masks,...
+            handles.data.metadata);         
+      
         set(handles.gui.showMask, 'Visible', 'On')
         
         guidata(hObject, handles);
