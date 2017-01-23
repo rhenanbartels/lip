@@ -693,7 +693,7 @@ function openAirWay(hObject, eventdata)
         masks = nrrd_read([pathName fileName]);
         airWayMask = flipdim(masks, 3);
         handles.data.lungMask(airWayMask >= 1) = 0;
-         guidata(hObject, handles)
+        guidata(hObject, handles)
     end
    
 end
@@ -738,6 +738,30 @@ function openHDR(hObject, eventdata)
         %menu
         set(handles.gui.calibrationMenu, 'Enable', 'On')
         set(handles.gui.imageMenu, 'Enable', 'On')        
+    end
+end
+
+function openNrrdMask(hObject, eventdata)
+    handles = guidata(hObject);
+    
+    [fileName pathName] = uigetfile('*.nrrd','Choose AIRWAY file',...
+        handles.lastPath);
+    
+    if fileName
+        masks = nrrd_read([pathName fileName]);
+        nTypes = unique(masks);
+        
+        %Chest Image Platform
+        if nTypes > 2
+            masks(masks > 500) = 0;            
+        end
+        
+        masks(masks >= 1) = 1;
+        
+        handles.data.lungMask = masks;
+        set(handles.gui.showMask, 'Visible', 'On')
+        
+        guidata(hObject, handles);
     end
 end
 
@@ -820,7 +844,7 @@ function drawInterface()
     screenSize = get(0, 'ScreenSize');
     mainFigure = figure('IntegerHandle','off',...
         'Menubar', 'None',...
-        'Name', 'Batch P15',...
+        'Name', 'LIP: Lung Image Processing 0.0.3dev0',...
         'Number', 'Off',...
         'Position', screenSize,...
         'tag', 'mainFig');
@@ -854,14 +878,15 @@ function drawInterface()
         'Label', '.hdr',...
         'Callback', @openHDR)
     
-    nrrdMenu = uimenu('Parent', masksMenu,...
-        'Label', '.nrrd');
+   uimenu('Parent', masksMenu,...
+        'Label', '.nrrd',...
+        'Callback', @openNrrdMask);
     
-    uimenu('Parent', nrrdMenu,...
-        'Label', 'without airway');
-    
-    uimenu('Parent', nrrdMenu,...
-        'Label', 'with airway');
+%     uimenu('Parent', nrrdMenu,...
+%         'Label', 'without airway');
+%     
+%     uimenu('Parent', nrrdMenu,...
+%         'Label', 'with airway');
     
         
     uimenu('Parent', masksMenu,...
