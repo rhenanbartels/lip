@@ -789,6 +789,7 @@ function openNrrdMask(hObject, eventdata)
       
         set(handles.gui.showMask, 'Visible', 'On')
         set(handles.gui.imageMenu, 'Enable', 'On')
+        set(handles.gui.calibrationMenu, 'Enable', 'On')
         
         guidata(hObject, handles);
     end
