@@ -788,6 +788,7 @@ function openNrrdMask(hObject, eventdata)
             handles.data.metadata);         
       
         set(handles.gui.showMask, 'Visible', 'On')
+        set(handles.gui.imageMenu, 'Enable', 'On')
         
         guidata(hObject, handles);
     end
@@ -948,8 +949,7 @@ function drawInterface()
     uimenu('Parent', imageMenu,...
         'Label', 'Flip Mask',...
         'Callback', @flipMask);
-    
-    
+       
     
     %% Buttons %%
     uicontrol('Parent', mainFigure,...
