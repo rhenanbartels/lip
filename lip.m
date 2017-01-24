@@ -777,7 +777,7 @@ function openNrrdMask(hObject, eventdata)
         nTypes = unique(masks);
         
         %Chest Image Platform
-        if nTypes > 2
+        if length(nTypes) > 2
             masks(masks > 500) = 0;            
         end
         
@@ -790,7 +790,7 @@ function openNrrdMask(hObject, eventdata)
         set(handles.gui.showMask, 'Visible', 'On')
         set(handles.gui.imageMenu, 'Enable', 'On')
         set(handles.gui.calibrationMenu, 'Enable', 'On')
-        
+        set(handles.gui.executeButton, 'Visible', 'On')
         guidata(hObject, handles);
     end
 end
