@@ -131,9 +131,9 @@ function results  = lungAnalysis(lung, mask, metadata)
     
     lung(mask == 0) = 10000;
     
-    lung = int32(lung);
+    lung = int16(lung);
 
-    lung(lung < -1000 | lung > 100) = [];
+    lung(lung < -1000 | lung > 50) = [];
 
 
 
@@ -442,8 +442,9 @@ end
 
 %%%% LUNG CALIBRATION %%%%
 function calibratedLung = lungCalibration(rawLung, mAir, mTissue)
-    coef = polyfit([mAir, mTissue], [-1000 50], 1);
-    calibratedLung = rawLung * coef(1) + coef(2);
+    coef = polyfit([round(mAir), round(mTissue)], [-1000 50], 1);
+    calibratedLung = int16(rawLung) * int16(coef(1)) + int16(coef(2));
+
 end
 
 function masks = getHDRMask(fileName)
