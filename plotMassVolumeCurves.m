@@ -9,7 +9,8 @@ function fig = plotMassVolumeCurves(fig, massVector, volumeVector,...
     hold on
     
     for i = 1:size(massVector, 1)
-     plot(massVector(i, :), volumeVector(i, :), plotColor)
+     plot(massVector(i, ~isnan(massVector(i, :))),...
+         volumeVector(i, ~isnan(volumeVector(i, :))), plotColor)
     end
     
     hold off

@@ -16,6 +16,7 @@ function [averageMass, lowerStd, upperStd] =...
             [val, pos] = min(abs(currentPatientVolume - i));
             percentMass(j) = massVector(j, pos);
         end
+        percentMass = percentMass(~isnan(percentMass));
         averageMass(i) = mean(percentMass);
         lowerStd(i) = averageMass(i) - 2 * std(percentMass);
         upperStd(i) = averageMass(i) + 2 * std(percentMass);
