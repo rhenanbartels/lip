@@ -701,6 +701,7 @@ function saveResults(hObject, eventdata)
         allResults.structure.lung = handles.data.lung;
         allResults.structure.roiAir = handles.data.roiAir;
         allResults.structure.roiTissue = handles.data.roiTissue;
+        allResults.structure.metadata = handles.data.metadata;
         save([pathName name], 'allResults')
     end
 end
