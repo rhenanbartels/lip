@@ -658,6 +658,8 @@ function openDicom(hObject, eventdata)
         
         if min(lung(:)) < 0        
             lung = uncalibrateLung(dicomImages, metadata(1));
+        else 
+            lung = single(dicomImages);
         end
         
         %Sort lung
