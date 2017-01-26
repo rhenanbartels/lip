@@ -865,7 +865,7 @@ function execute(hObject, eventdata)
         
         handles.data.roiAir = roiAir;
         handles.data.roiTissue = roiTissue;
-        
+        handles.data.lung = lung;
         %Enable save results menu
         set(handles.gui.saveResults, 'Enable', 'On');
         
