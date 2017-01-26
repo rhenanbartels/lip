@@ -656,7 +656,7 @@ function openDicom(hObject, eventdata)
         
         [metadata, dicomImages] = getDicomData(dirName);   
         
-        if min(lung(:)) < 0        
+        if min(dicomImages(:)) < 0        
             lung = uncalibrateLung(dicomImages, metadata(1));
         else 
             lung = single(dicomImages);
