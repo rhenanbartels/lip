@@ -654,9 +654,11 @@ function openDicom(hObject, eventdata)
         
         handles.lastPath = dirName;
         
-        [metadata, dicomImages] = getDicomData(dirName);        
-        lung = uncalibrateLung(dicomImages, metadata(1));
-       
+        [metadata, dicomImages] = getDicomData(dirName);   
+        
+        if min(lung(:)) < 0        
+            lung = uncalibrateLung(dicomImages, metadata(1));
+        end
         
         %Sort lung
         [handles.data.lung, handles.data.metadata] =...
