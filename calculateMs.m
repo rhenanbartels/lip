@@ -12,9 +12,12 @@ function [m3, m15, m85, m97] = calculateMs(massVector, volumeVector)
         [t, m85Pos] = min(abs(volumeVector(j,:) - 85));
         [t, m97Pos] = min(abs(volumeVector(j,:) - 97));
         
-        m3(j) = massVector(j, m3Pos);
-        m15(j) = massVector(j, m15Pos);
-        m85(j) = massVector(j, end) -  massVector(j, m85Pos);
-        m97(j) = massVector(j, end) -  massVector(j, m97Pos);
+        currentMass = massVector(j, :);
+        currentMass(isnan(currentMass)) = [];
+        
+        m3(j) = currentMass(m3Pos);
+        m15(j) = currentMass(m15Pos);
+        m85(j) = currentMass(end) -  currentMass(m85Pos);
+        m97(j) = currentMass(end) -  currentMass(m97Pos);
     end
 end
