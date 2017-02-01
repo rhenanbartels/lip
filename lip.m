@@ -654,9 +654,13 @@ function openDicom(hObject, eventdata)
         
         handles.lastPath = dirName;
         
-        [metadata, dicomImages] = getDicomData(dirName);        
-        lung = uncalibrateLung(dicomImages, metadata(1));
-       
+        [metadata, dicomImages] = getDicomData(dirName);   
+        
+        if min(dicomImages(:)) < 0        
+            lung = uncalibrateLung(dicomImages, metadata(1));
+        else 
+            lung = single(dicomImages);
+        end
         
         %Sort lung
         [handles.data.lung, handles.data.metadata] =...
@@ -861,7 +865,7 @@ function execute(hObject, eventdata)
         
         handles.data.roiAir = roiAir;
         handles.data.roiTissue = roiTissue;
-        
+        handles.data.lung = lung;
         %Enable save results menu
         set(handles.gui.saveResults, 'Enable', 'On');
         
