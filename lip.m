@@ -116,7 +116,7 @@ function [lungOrMask, metadatas] = sortLungOrMask(lungOrMask, metadatas)
     
     [trash, sortedIndexes] = sort(sliceLocations);
     
-    lungOrMask = lungOrMask(:, :, sortedIndexes);
+%    lungOrMask = lungOrMask(:, :, sortedIndexes);
     if nargout == 2
         metadatas = metadatas(sortedIndexes);
     end
@@ -719,7 +719,7 @@ function openAirWay(hObject, eventdata)
     if fileName
         masks = nrrd_read([pathName fileName]);
         airWayMask = flipdim(masks, 3);
-        handles.data.lungMask(airWayMask >= 1) = 0;
+        handles.data.lungMask(airWayMask  >= 1) = 0;
         guidata(hObject, handles)
     end
    
