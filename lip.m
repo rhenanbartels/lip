@@ -166,14 +166,27 @@ function results  = lungAnalysis(lung, mask, metadata)
 
     [~, pos3] = min(abs(cumulativeVolume - 3));
     [~, pos15] = min(abs(cumulativeVolume - 15));    
+    [~, pos65] = min(abs(cumulativeVolume - 65));    
+    [~, pos70] = min(abs(cumulativeVolume - 70));    
+    [~, pos75] = min(abs(cumulativeVolume - 75));    
+    [~, pos80] = min(abs(cumulativeVolume - 80));
     [~, pos85] = min(abs(cumulativeVolume - 85));
     [~, pos97] = min(abs(cumulativeVolume - 97));
 
     results.p3Mass = sumMass(pos3);
-    results.p15Mass = sumMass(pos15);    
+    results.p15Mass = sumMass(pos15);
+    results.p65Mass = sumMass(end) - sumMass(pos65);
+    results.p70Mass = sumMass(end) - sumMass(pos70);
+    results.p75Mass = sumMass(end) - sumMass(pos75);
+    results.p80Mass = sumMass(end) - sumMass(pos80);
     results.p85Mass = sumMass(end) - sumMass(pos85);
     results.p97Mass = sumMass(end) - sumMass(pos97);
-    
+
+    results.p65Vol = sumVolume(end) - sumVolume(pos65);
+    results.p70Vol = sumVolume(end) - sumVolume(pos70);
+    results.p75Vol = sumVolume(end) - sumVolume(pos75);
+    results.p80Vol = sumVolume(end) - sumVolume(pos80);
+
     results.p3Volume = sumVolume(pos3);
     results.p15Volume = sumVolume(pos15);
     results.p85Volume = sumVolume(end) - sumVolume(pos85);
@@ -851,7 +864,7 @@ function execute(hObject, eventdata)
         handles.data.avgTissue = avgTissue;
         
         %Calibrate Lung
-        lung = lungCalibration(handles.data.lung,...
+        handles.data.lung = lungCalibration(handles.data.lung,...
             handles.data.avgAir, handles.data.avgTissue);
         [handles.data.resultsClassicalWholeLung,...
             handles.data.resultsPercentileWholeLung,...
@@ -861,7 +874,7 @@ function execute(hObject, eventdata)
             handles.data.resultsPercentileMiddleLung,...
             handles.data.resultsClassicalTopLung,...
             handles.data.resultsPercentileTopLung]  =...
-            allAnalysis(lung, handles.data.lungMask, handles.data.metadata);
+            allAnalysis(handles.data.lung, handles.data.lungMask, handles.data.metadata);
         
         handles.data.roiAir = roiAir;
         handles.data.roiTissue = roiTissue;
