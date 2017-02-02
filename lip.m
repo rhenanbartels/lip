@@ -219,8 +219,8 @@ function results = classicalAnalysis(lung, mask, metadata)
    
     
     hyper = [-1000, -901];
-    poor = [-900, -501];
-    normally = [-500, -101];
+    normally = [-900, -501];
+    poor = [-500, -101];
     non = [-100, 100];
     
     %Mass
@@ -719,6 +719,7 @@ function saveResults(hObject, eventdata)
         allResults.structure.roiAir = handles.data.roiAir;
         allResults.structure.roiTissue = handles.data.roiTissue;
         allResults.structure.metadata = handles.data.metadata;
+        allResults.structure.errata = 'Changed poor to normally';
         save([pathName name], 'allResults')
     end
 end
@@ -878,7 +879,7 @@ function execute(hObject, eventdata)
         
         handles.data.roiAir = roiAir;
         handles.data.roiTissue = roiTissue;
-        handles.data.lung = lung;
+        handles.data.lung = handles.data.lung;
         %Enable save results menu
         set(handles.gui.saveResults, 'Enable', 'On');
         
