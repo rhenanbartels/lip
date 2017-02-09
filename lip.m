@@ -619,6 +619,15 @@ properties = get(a, 'Position');
     function dropObject(hObject,eventdata)
         
         dragging = [];
+        handles = guidata(hObject);
+        color = get(a, 'EdgeColor');
+        if color == [0 1 0];
+            [m, imgMask] = averageCircle(handles, 'air');
+            disp(['Valor médio da ROI da TRAQUEIA é: ' num2str(round(m))]);
+        else
+            [m, imgMask] = averageCircle(handles, 'tissue');
+            disp(['Valor médio da ROI da AORTA é: ' num2str(round(m))]);
+        end
         
     end
     function moveObject(hObject,eventdata)
