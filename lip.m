@@ -678,11 +678,7 @@ function openDicom(hObject, eventdata)
         
         [metadata, dicomImages] = getDicomData(dirName);   
         
-        if min(dicomImages(:)) < 0        
-            lung = uncalibrateLung(dicomImages, metadata(1));
-        else 
-            lung = single(dicomImages);
-        end
+        lung = single(dicomImages);
         
         %Sort lung
         %[handles.data.lung, handles.data.metadata] =...
@@ -878,6 +874,15 @@ function execute(hObject, eventdata)
     if hasROIS
         handles.data.avgAir = avgAir;
         handles.data.avgTissue = avgTissue;
+        
+        mask = handles.data.lungMask;
+        mask(mask >=1) = 1;
+        parenchyma = handles.data.lung .* single(mask);
+        
+        if min(parenchyma(:)) < 0
+            handles.data.lung = uncalibrateLung(handles.data.lung,...
+                handles.data.metadata{1});
+        end
         
         %Calibrate Lung
         handles.data.lung = lungCalibration(handles.data.lung,...
