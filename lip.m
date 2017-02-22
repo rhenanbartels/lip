@@ -875,9 +875,12 @@ function execute(hObject, eventdata)
         handles.data.avgAir = avgAir;
         handles.data.avgTissue = avgTissue;
         
+
+        parenchyma = handles.data.lung;
         mask = handles.data.lungMask;
-        mask(mask >=1) = 1;
-        parenchyma = handles.data.lung .* single(mask);
+        mask(mask >= 1) = 1;
+        parenchyma(mask ~= 1) = 10000;
+        
         
         if min(parenchyma(:)) < 0
             handles.data.lung = uncalibrateLung(handles.data.lung,...
