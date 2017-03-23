@@ -129,16 +129,15 @@ function results  = lungAnalysis(lung, mask, metadata)
     roiAir = -1000;
     roiTissue = 50;
     
-    lung(mask == 0) = 10000;
+    lung(mask == 0) = [];
     
     lung = int16(lung);
 
-    lung(lung < -1000 | lung > 50) = [];
+    %lung(lung < -1000 | lung > 50) = [];
 
 
 
-    huValues = double(unique(lung));
-    nLung = size(lung, 3);
+    huValues = double(unique(lung));   
 
     massPerDensity = zeros(1, length(huValues));
     volumePerDensity = zeros(1, length(huValues));
@@ -147,10 +146,17 @@ function results  = lungAnalysis(lung, mask, metadata)
 
     %h = waitbar(0, 'Calculating Mass Percentile...');
 
-    for hu = huValues    
+    for i = 1:length(huValues)
+        hu = huValues(i);
         nVoxels = length(lung(lung == hu));
-        massPerDensity(counter) = ((hu - roiAir)/(roiTissue - roiAir))...
-            * voxelVolume * 1.04 * nVoxels;
+        if hu < -1000
+            massPerDensity(counter) = 0;
+        elseif hu > 50
+            massPerDensity(counter) = voxelVolume * 1.04 * nVoxels;
+        else
+            massPerDensity(counter) = ((hu - roiAir)/(roiTissue - roiAir))...
+                * voxelVolume * 1.04 * nVoxels;
+        end
         volumePerDensity(counter) = nVoxels * voxelVolume / 1000;
         voxelPerDensity(counter) = nVoxels;
         lung(lung == hu) = [];
@@ -518,7 +524,7 @@ function lung = uncalibrateLung(lung, metadata)
 end
 
 
-function [hasROIS, avgAir, avgTissue, roiAir, roiTissue] =...
+function [hasROIS, avgAir, avgTissue, roiAir, roiAirMask, roiTissue, roiTissueMask] =...
     checkForCalibrationROI(handles)   
     
     avgAir = NaN; avgTissue = NaN; roiAir = NaN; roiTissue = NaN;
@@ -534,12 +540,12 @@ function [hasROIS, avgAir, avgTissue, roiAir, roiTissue] =...
     hasROIS = nCircles == 2;
     
     if hasROIS
-        [avgAir, roiAir] = averageCircle(handles, 'air');
-        [avgTissue, roiTissue] = averageCircle(handles, 'tissue');
+        [avgAir, roiAir, roiAirMask] = averageCircle(handles, 'air');
+        [avgTissue, roiTissue, roiTissueMask] = averageCircle(handles, 'tissue');
     end
 end
 
-function [m, imgMask] = averageCircle(handles, roi_type)
+function [m, imgMask, mask] = averageCircle(handles, roi_type)
 %meanDisk computes mean of values inside a circle
 %   M = meanDisk(IMG, XC, YC, R) returns the mean of IMG(Y,X) for all X and
 %   Y such that the Euclidean distance of (X,Y) from (XC,YC) is less than
@@ -725,7 +731,11 @@ function saveResults(hObject, eventdata)
         allResults.structure.mask = handles.data.lungMask;
         allResults.structure.lung = handles.data.lung;
         allResults.structure.roiAir = handles.data.roiAir;
+        allResults.structure.roiAirMask = handles.data.roiAirMask;
+        allResults.structure.avgAir = handles.data.avgAir;        
         allResults.structure.roiTissue = handles.data.roiTissue;
+        allResults.structure.roiTissueMask = handles.data.roiTissueMask;
+        allResults.structure.avgTissue = handles.data.avgTissue;
         allResults.structure.metadata = handles.data.metadata;
         allResults.structure.errata = 'Changed poor to normally';
         save([pathName name], 'allResults')
@@ -817,7 +827,7 @@ function openNrrdMask(hObject, eventdata)
         %   handles.data.metadata);    
         
         handles.data.lungMask = masks;
-      
+        
         set(handles.gui.showMask, 'Visible', 'On')
         set(handles.gui.imageMenu, 'Enable', 'On')
         set(handles.gui.calibrationMenu, 'Enable', 'On')
@@ -868,28 +878,13 @@ end
 function execute(hObject, eventdata)
     handles = guidata(hObject);
     
-    [hasROIS, avgAir, avgTissue, roiAir, roiTissue] =...
+    [hasROIS, avgAir, avgTissue, roiAir, roiAirMask, roiTissue, roiTissueMask] =...
         checkForCalibrationROI(handles);
     
-    if hasROIS
-        handles.data.avgAir = avgAir;
-        handles.data.avgTissue = avgTissue;
-        
-
-        parenchyma = handles.data.lung;
-        mask = handles.data.lungMask;
-        mask(mask >= 1) = 1;
-        parenchyma(mask ~= 1) = 10000;
-        
-        
-        if min(parenchyma(:)) < 0
-            handles.data.lung = uncalibrateLung(handles.data.lung,...
-                handles.data.metadata{1});
-        end
-        
+    if hasROIS 
         %Calibrate Lung
         handles.data.lung = lungCalibration(handles.data.lung,...
-            handles.data.avgAir, handles.data.avgTissue);
+            avgAir, avgTissue);
         [handles.data.resultsClassicalWholeLung,...
             handles.data.resultsPercentileWholeLung,...
             handles.data.resultsClassicalBaseLung,...
@@ -898,10 +893,15 @@ function execute(hObject, eventdata)
             handles.data.resultsPercentileMiddleLung,...
             handles.data.resultsClassicalTopLung,...
             handles.data.resultsPercentileTopLung]  =...
-            allAnalysis(handles.data.lung, handles.data.lungMask, handles.data.metadata);
+            allAnalysis(handles.data.lung, handles.data.lungMask,...
+            handles.data.metadata);
         
         handles.data.roiAir = roiAir;
+        handles.data.roiAirMask = roiAirMask;
         handles.data.roiTissue = roiTissue;
+        handles.data.avgAir = avgAir;
+        handles.data.avgTissue = avgTissue;
+        handles.data.roiTissueMask = roiTissueMask;
         handles.data.lung = handles.data.lung;
         %Enable save results menu
         set(handles.gui.saveResults, 'Enable', 'On');
