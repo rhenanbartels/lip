@@ -524,25 +524,12 @@ function lung = uncalibrateLung(lung, metadata)
 end
 
 
-function [hasROIS, avgAir, avgTissue, roiAir, roiAirMask, roiTissue, roiTissueMask] =...
-    checkForCalibrationROI(handles)   
-    
-    avgAir = NaN; avgTissue = NaN; roiAir = NaN; roiTissue = NaN;
+function hasROIS = checkForCalibrationROI(handles)
 
-    children = get(handles.gui.mainAxes, 'Child');
-    nCircles = 0;
-    for i = 1:length(children)
-        fields = get(children(i));
-        if isfield(fields, 'Type') && strcmp(fields.Type, 'rectangle')  
-            nCircles = nCircles + 1;            
-        end
+    if isfield(handles.data, 'avgAir') && isfield(handles.data, 'avgTissue')
+        hasROIS = 1;
     end
-    hasROIS = nCircles == 2;
-    
-    if hasROIS
-        [avgAir, roiAir, roiAirMask] = averageCircle(handles, 'air');
-        [avgTissue, roiTissue, roiTissueMask] = averageCircle(handles, 'tissue');
-    end
+
 end
 
 function [m, imgMask, mask] = averageCircle(handles, roi_type)
@@ -628,11 +615,9 @@ properties = get(a, 'Position');
         handles = guidata(hObject);
         color = get(a, 'EdgeColor');
         if color == [0 1 0];
-            [m, imgMask] = averageCircle(handles, 'air');
-            disp(['Valor médio da ROI da TRAQUEIA é: ' num2str(round(m))]);
+            [m, imgMask] = averageCircle(handles, 'air');            ;
         else
-            [m, imgMask] = averageCircle(handles, 'tissue');
-            disp(['Valor médio da ROI da AORTA é: ' num2str(round(m))]);
+            [m, imgMask] = averageCircle(handles, 'tissue');            
         end
         
     end
@@ -697,11 +682,59 @@ function openDicom(hObject, eventdata)
         prepareAndShowLung(handles, 1)
         makeWidgetsVisible(handles)
         
+        handles.data.wl = -500;
+        handles.data.ww = 1400;
+        
         guidata(hObject, handles)
         
         %Set patient name
         set(handles.gui.patName, 'String', dirName);
     end
+end
+
+function getRoiAirValue(hObject, eventdata)
+    handles = guidata(hObject);
+    circleObject = findobj(gca, 'Type', 'rectangle','-and',...
+        'EdgeColor', 'g');
+    
+    if ~isempty(circleObject)
+        [avgAir, roiAir, roiAirMask] = averageCircle(handles, 'air'); 
+        set(handles.gui.roiAir, 'String', ['ROI Air: ' sprintf('%.2f', avgAir)])
+        handles.data.avgAir = avgAir;
+        handles.data.roiAir = roiAir;
+        handles.data.roiAirMask = roiAirMask;
+        guidata(hObject, handles)
+    end
+end
+
+function getRoiTissueValue(hObject, eventdata)
+    handles = guidata(hObject);
+    circleObject = findobj(gca, 'Type', 'rectangle','-and',...
+        'EdgeColor', 'r');
+    
+    if ~isempty(circleObject)
+        [avgTissue, roiTissue, roiTissueMask] = averageCircle(handles, 'tissue');
+        set(handles.gui.roiTissue, 'String', ['ROI Tissue: ' sprintf('%.2f', avgTissue)])
+        handles.data.avgTissue = avgTissue;
+        handles.data.roiTissue = roiTissue;
+        handles.data.roiTissueMask = roiTissueMask;
+        guidata(hObject, handles)
+    end
+end
+
+function showSliceMask(hObject, eventdata)
+    handles = guidata(hObject);
+    
+    currentSlice = getCurrentSlicePosition(handles);
+    
+    lungSlice = handles.data.lung(:, :, currentSlice);
+    lungDim = size(lungSlice, 1);
+    mask = handles.data.lungMask(:, :, currentSlice);
+    figure;
+    imagesc(lungSlice)
+    colormap(gray)
+    showMask(lungDim, mask)
+    
 end
 
 %Save Results
@@ -799,11 +832,35 @@ function openHDR(hObject, eventdata)
         %Enable widget On
         set(handles.gui.showMask, 'Visible', 'On')
         set(handles.gui.executeButton, 'Visible', 'On'); 
+        set(handles.gui.roiAirButton, 'Visible', 'On');
+        set(handles.gui.roiTissueButton, 'Visible', 'On');
+        set(handles.gui.roiAir, 'Visible', 'On');
+        set(handles.gui.roiTissue, 'Visible', 'On');
+        set(handles.gui.tBoneButton, 'Visible', 'On');
+        set(handles.gui.pulmonaryButton, 'Visible', 'On');
+        set(handles.gui.showSliceMask, 'Visible', 'On');
         %menu
         set(handles.gui.calibrationMenu, 'Enable', 'On')
         set(handles.gui.imageMenu, 'Enable', 'On')        
     end
 end
+
+function tBoneView(hObject, eventdata)
+    handles = guidata(hObject);
+    changeWindowView(handles.data.lung, 300, 1500)
+    handles.data.wl = 300;
+    handles.data.ww = 1550;
+    guidata(hObject, handles)
+end
+
+function pulmonaryView(hObject, eventdata)
+    handles = guidata(hObject);
+    changeWindowView(handles.data.lung);
+    handles.data.wl = -500;
+    handles.data.ww = 1400;
+    guidata(hObject, handles)
+end
+
 
 function openNrrdMask(hObject, eventdata)
     handles = guidata(hObject);
@@ -832,6 +889,13 @@ function openNrrdMask(hObject, eventdata)
         set(handles.gui.imageMenu, 'Enable', 'On')
         set(handles.gui.calibrationMenu, 'Enable', 'On')
         set(handles.gui.executeButton, 'Visible', 'On')
+        set(handles.gui.roiAirButton, 'Visible', 'On');
+        set(handles.gui.roiTissueButton, 'Visible', 'On');
+        set(handles.gui.roiAir, 'Visible', 'On');
+        set(handles.gui.roiTissue, 'Visible', 'On');
+        set(handles.gui.tBoneButton, 'Visible', 'On');
+        set(handles.gui.pulmonaryButton, 'Visible', 'On');
+        set(handles.gui.showSliceMask, 'Visible', 'On');
         guidata(hObject, handles);
     end
 end
@@ -844,11 +908,12 @@ function moveSlice(hObject, eventdata, direction)
         currentSlicePosition = currentSlicePosition + 1;
     else
         currentSlicePosition = currentSlicePosition - 1;
-    end
+    end    
     
     newSlicePosition = decideNewSlice(lung, currentSlicePosition);
-    setCurrentSlicePosition(handles, newSlicePosition)
-    prepareAndShowLung(handles, newSlicePosition)
+    setCurrentSlicePosition(handles, newSlicePosition);
+    prepareAndShowLung(handles, newSlicePosition);
+    changeWindowView(lung, handles.data.wl, handles.data.ww);
 end
 
 function newSlicePosition = decideNewSlice(lung, currentSlicePosition)
@@ -878,13 +943,12 @@ end
 function execute(hObject, eventdata)
     handles = guidata(hObject);
     
-    [hasROIS, avgAir, avgTissue, roiAir, roiAirMask, roiTissue, roiTissueMask] =...
-        checkForCalibrationROI(handles);
+    hasROIS = checkForCalibrationROI(handles);
     
     if hasROIS 
         %Calibrate Lung
         handles.data.lung = lungCalibration(handles.data.lung,...
-            avgAir, avgTissue);
+            handles.data.avgAir, handles.data.avgTissue);
         [handles.data.resultsClassicalWholeLung,...
             handles.data.resultsPercentileWholeLung,...
             handles.data.resultsClassicalBaseLung,...
@@ -896,12 +960,7 @@ function execute(hObject, eventdata)
             allAnalysis(handles.data.lung, handles.data.lungMask,...
             handles.data.metadata);
         
-        handles.data.roiAir = roiAir;
-        handles.data.roiAirMask = roiAirMask;
-        handles.data.roiTissue = roiTissue;
-        handles.data.avgAir = avgAir;
-        handles.data.avgTissue = avgTissue;
-        handles.data.roiTissueMask = roiTissueMask;
+
         handles.data.lung = handles.data.lung;
         %Enable save results menu
         set(handles.gui.saveResults, 'Enable', 'On');
@@ -1019,6 +1078,67 @@ function drawInterface()
         'Visible', 'Off',...
         'Tag', 'executeButton',...
         'Callback', @execute)    
+    
+    uicontrol('Parent', mainFigure,...
+        'Units', 'Normalized',...
+        'Position',[0.85, 0.5, 0.08, 0.03],...
+        'String', 'Set ROI Air',...
+        'Visible', 'Off',...
+        'Tag', 'roiAirButton',...
+        'Callback', @getRoiAirValue)    
+    
+        uicontrol('Parent', mainFigure,...
+        'Units', 'Normalized',...
+        'Position',[0.85, 0.45, 0.08, 0.03],...
+        'String', 'Set ROI Tissue',...
+        'Visible', 'Off',...
+        'Tag', 'roiTissueButton',...
+        'Callback', @getRoiTissueValue)   
+    
+    uicontrol('Parent',mainFigure,...
+        'Style', 'text',...
+        'HorizontalAlignment', 'left',...
+        'Units', 'Normalized',...
+        'Position', [0.85, 0.4, 0.12, 0.03],...
+        'String', 'ROI Air: -',...
+        'Backgroundcolor', bckColor,...
+        'Tag', 'roiAir',...
+        'Visible', 'Off')
+    
+    uicontrol('Parent',mainFigure,...
+        'Style', 'text',...
+        'HorizontalAlignment', 'left',...
+        'Units', 'Normalized',...
+        'Position', [0.85, 0.35, 0.12, 0.03],...
+        'String', 'ROI Tissue: -',...
+        'Backgroundcolor', bckColor,...
+        'Tag', 'roiTissue',...
+        'Visible', 'Off')
+    
+    uicontrol('Parent', mainFigure,...
+        'Units', 'Normalized',...
+        'Position',[0.85, 0.65, 0.08, 0.03],...
+        'String', 'T-Bone',...
+        'Visible', 'Off',...
+        'Tag', 'tBoneButton',...
+        'Callback', @tBoneView)
+    
+    uicontrol('Parent', mainFigure,...
+        'Units', 'Normalized',...
+        'Position',[0.85, 0.7, 0.08, 0.03],...
+        'String', 'Pulmonary',...
+        'Visible', 'Off',...
+        'Tag', 'pulmonaryButton',...
+        'Callback', @pulmonaryView)
+    
+   uicontrol('Parent', mainFigure,...
+        'Units', 'Normalized',...
+        'Position',[0.85, 0.85, 0.08, 0.03],...
+        'String', 'Show Slice Mask',...
+        'Visible', 'Off',...
+        'Tag', 'showSliceMask',...
+        'Callback', @showSliceMask)
+    
     
    
     %% Edit box %%
@@ -1239,6 +1359,21 @@ switch (meta.encoding)
  otherwise
   assert(false, 'Unsupported encoding')
 end
+end
+
+function [displayLow, displayHigh] = changeWindowView(dicomData, wl, ww)
+
+    if nargin < 2
+        ww = 1400;
+        wl = -500;
+    elseif nargin < 3
+        ww = 1400;        
+    end
+    
+    displayLow = max(wl - 0.5 * ww, min(dicomData(:)));
+    displayHigh = max(wl + 0.5 * ww, min(dicomData(:)));
+    
+    set(gca, 'CLim', [displayLow, displayHigh]);
 end
 
 
