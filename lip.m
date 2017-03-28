@@ -116,7 +116,7 @@ function [lungOrMask, metadatas] = sortLungOrMask(lungOrMask, metadatas)
     
     [trash, sortedIndexes] = sort(sliceLocations);
     
-%    lungOrMask = lungOrMask(:, :, sortedIndexes);
+    lungOrMask = lungOrMask(:, :, sortedIndexes);
     if nargout == 2
         metadatas = metadatas(sortedIndexes);
     end
@@ -615,7 +615,7 @@ properties = get(a, 'Position');
         handles = guidata(hObject);
         color = get(a, 'EdgeColor');
         if color == [0 1 0];
-            [m, imgMask] = averageCircle(handles, 'air');            ;
+            [m, imgMask] = averageCircle(handles, 'air');            
         else
             [m, imgMask] = averageCircle(handles, 'tissue');            
         end
@@ -672,10 +672,10 @@ function openDicom(hObject, eventdata)
         lung = single(dicomImages);
         
         %Sort lung
-        %[handles.data.lung, handles.data.metadata] =...
-        %    sortLungOrMask(lung, metadata);
+        [handles.data.lung, handles.data.metadata] =...
+            sortLungOrMask(lung, metadata);
         
-        handles.data.lung = lung;
+        %handles.data.lung = lung;
         handles.data.metadata = metadata;
         
         %Post opening
